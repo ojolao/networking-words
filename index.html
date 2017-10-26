@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Networking Words </title>
+    <script type='application/javascript' src='https://raw.githubusercontent.com/anvaka/VivaGraphJS/master/dist/vivagraph.js'> </script>
+  </head>
+  <body>
+    <section class="user-input">
+      <div>
+        <form id="myForm">
+          Enter words to render in a network here:
+          <input id="userInput" type="text" name="words"> <br>
+          Select rendering mode:
+          <input type="radio" name="renderingMode" value="SVG">SVG
+          <input type="radio" name="renderingMode" value="webGL">WebGL <br>
+          <input type="submit" value="submit">
+        </form>
+      </div>
+    </section>
+    <section>
+      <div>
+        <button>Reset</button>
+      </div>
+    </section>
+    <script> 
+      function parseConnection(words){
+        const wordCol = words.split(' ');
+        const chars = {};
+        // find shared letters
+          // create hash from first word, you could have repetition
+          // l: {count1: {wordCol[0], wordCol[1]}, count2: {}} //obj instant lookup
+        // if there are letters remaining that are not shared, should be in its own node
+        wordCol.forEach((word, i) => {
+          const wordArray = word.split('');
+          wordArray.forEach((char) => {
+            if (!chars[char]) {
+              chars[char] = { count: 1, count1: {} };
+              chars[char].count1[word] = true;
+            } else { // character already exists, how do I differentiate the words
+              if (i === 0) {
+                chars[char].count++;
+                const charCountStr = 'count' + chars[char].count;
+                chars[char][charCountStr] = {};
+                chars[char][charCountStr][word] = true;
+              } else {
+                let start = 1;
+                let inserted = false;
+                while (start <= chars[char].count) {
+                  const currentCount = 'count' + start;
+                  if (!chars[char][currentCount][word]) {
+                    chars[char][currentCount][word] = true;
+                    inserted = true;
+                    break;
+                  } else {
+                    start++;
+                  }
+                }
+                if (!inserted) {
+                  chars[char].count++;
+                  const charCountStr = 'count' + chars[char].count;
+                  chars[char][charCountStr] = {};
+                  chars[char][charCountStr][word] = true;
+                }
+              }
+            }
+          });
+        });
+        return chars;
+      }
+      const form = document.getElementById('myForm');
+      const graph = Viva.Graph.graph();
+      console.log('graph:', graph);
+      function handleForm(event) {
+        event.preventDefault();
+        const words = document.getElementById('userInput').value;
+        parseConnection(words);
+      }
+      form.addEventListener('submit', handleForm);
+    </script>
+  </body>
+</html>

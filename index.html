@@ -2,10 +2,17 @@
 <html>
   <head>
     <title>Networking Words </title>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script> -->
     <script type='application/javascript' src='vivagraph.min.js'> </script>
     <style type="text/css" media="screen">
-        html, body, svg { width: 100%; height: 100%; position: absolute;}
+        html, body, svg, canvas, #displayNetwork { width: 100%; height: 100%; position: absolute; overflow: wrap;}
+
+        .node-label {
+                  position: absolute;
+                  pointer-events: none;
+                  color: black;
+                  z-index: 10;
+            }
     </style>
   </head>
   <body>
@@ -16,45 +23,109 @@
           <input name="userWords" type="text"> <br>
           Select rendering mode:
           <input type="radio" name="renderingMode" value="SVG">SVG
-          <input type="radio" name="renderingMode" value="webGL">WebGL <br>
+          <input type="radio" name="renderingMode" value='webGL'>WebGL <br>
           <input type="submit" value="submit">
         </form> 
       </div>
     </section>
     <div>
-      <button>Reset</button>
+      <button id="resetButton">Reset</button>
     </div>
     <section>
       <div id="displayNetwork"></div>
     </section>
     <script> 
       const form = document.mainForm;
+      let graph = Viva.Graph.graph();
+      //let graphics = undefined;
+      const container = document.getElementById('displayNetwork');
+      
 
-      const graph = Viva.Graph.graph();
-      const graphics = Viva.Graph.View.svgGraphics();
-      const renderer = Viva.Graph.View.renderer(graph, {
-        container: document.getElementById('displayNetwork'),
-        graphics: graphics,
-      });
+      function generateNodeGraphics(mode) {
+        if (mode === 'SVG') {
+          graphics = Viva.Graph.View.svgGraphics();
+          graphics.node((node) => {
+            const ui = Viva.Graph.svg('g');
+            const svgText = Viva.Graph.svg('text').text(node.data.text);
+            ui.append(svgText);
+            return ui;
+        }).placeNode((nodeUI, pos) => {
+          nodeUI.attr('transform', 'translate(' + (pos.x) + ',' + (pos.y) + ')');
+        });
+        const renderer = Viva.Graph.View.renderer(graph, {
+            container: document.getElementById('displayNetwork'),
+            graphics: graphics,
+          });
+          renderer.run();
+        } else if (mode === 'webGL') {
+          function generateDOMLabels(graph) {
+            // this will map node id into DOM element
+            const labels = Object.create(null);
+            graph.forEachNode((node) => {
+              const label = document.createElement('span');
+              label.classList.add('node-label');
+              label.innerText = node.data.text;
+              labels[node.id] = label;
+              container.appendChild(label);
+            });
+            // NOTE: If your graph changes over time you will need to
+            // monitor graph changes and update DOM elements accordingly
+            return labels;
+          }
 
-      graphics.node((node) => {
-        const ui = Viva.Graph.svg('g');
-        const svgText = Viva.Graph.svg('text').attr('y', '-4px').text(node.data.text);
-        ui.append(svgText);
-        return ui;
-      }).placeNode((nodeUI, pos) => {
-        nodeUI.attr('transform', 'translate(' + (pos.x - 16) + ',' + (pos.y - 16) + ')');
-      });
-      // renderer.run()
+          const graphics = Viva.Graph.View.webglGraphics();
+          const domLabels = generateDOMLabels(graph);
+          //console.log('domLabels', domLabels);
+          graphics.placeNode((ui, pos) => {
+            const domPos = {
+              x: pos.x,
+              y: pos.y,
+            };
+            graphics.transformGraphToClientCoordinates(domPos);
+
+            const nodeId = ui.node.id;
+            const labelStyle = domLabels[nodeId].style;
+            labelStyle.left = domPos.x + 'px';
+            labelStyle.top = domPos.y + 'px';
+          });
+          // console.log('graphics', graphics);
+          const renderer = Viva.Graph.View.renderer(graph, {
+            container: document.getElementById('displayNetwork'),
+            graphics: graphics,
+          });
+          renderer.run();
+        }
+      }
+      // graphics.node((node) => {
+      //   const ui = Viva.Graph.svg('g'); // .attr('stroke', 'green').attr('stroke-width', 1);
+      //   // const circle = Viva.Graph.svg('circle').attr('cy', 25).attr('cx', 25).attr('r', 15);
+      //   const svgText = Viva.Graph.svg('text').text(node.data.text);
+      //   // const rect = Viva.Graph.svg('rect')
+      //   //                  .attr('width', 20)
+      //   //                  .attr('height', 10)
+      //   //                  .attr('fill', '#00a2e8');
+      //   // ui.append(circle);
+      //   ui.append(svgText);
+      //   // ui.append(rect);
+      //   return ui;
+      // }).placeNode((nodeUI, pos) => {
+      //   nodeUI.attr('transform', 'translate(' + (pos.x) + ',' + (pos.y) + ')');
+      // });
 
       function handleForm(event) {
         event.preventDefault();
+        // console.log('innerHTML:', document.getElementById('displayNetwork').innerHTML);
         const words = document.mainForm.userWords.value;
         const rendMode = document.mainForm.renderingMode.value;
         parseConnection(words);
-        renderer.run();
+        generateNodeGraphics(rendMode);
+        // renderer.run();
       }
       form.addEventListener('submit', handleForm);
+      document.getElementById('resetButton').addEventListener('click', () => {
+        // document.getElementById('displayNetwork').innerHTML = '';
+        window.location.reload();
+      });
 
       function parseConnection(words) {
         const wordCol = words.split(' ');
@@ -64,10 +135,11 @@
           const wordArray = word.split('');
           wordArray.forEach((char) => {
             if (!chars[char]) {
+              const newNodeId = char + 'count1';
               chars[char] = { count: 1, count1: {} };
-              graph.addNode(char, { text: char, type: 'letter' });
+              graph.addNode(newNodeId, { text: char, type: 'letter' });
               chars[char].count1[word] = true;
-              graph.addLink(char, word);
+              graph.addLink(newNodeId, word);
             } else {
                 const addLetters = () => {
                   chars[char].count++;
@@ -86,7 +158,9 @@
                 while (start <= chars[char].count) {
                   const currentCount = 'count' + start;
                   if (!chars[char][currentCount][word]) {
+                    const curNodeId = char + currentCount;
                     chars[char][currentCount][word] = true;
+                    graph.addLink(curNodeId, word);
                     inserted = true;
                     break;
                   } else {
@@ -100,7 +174,7 @@
             }
           });
         });
-        console.log('chars', chars);
+        return chars;
       }
     </script>
   </body>

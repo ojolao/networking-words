@@ -1,0 +1,53 @@
+
+* {
+  box-sizing: border-box;
+  font-family: Open Sans, sans-serif;
+}
+
+html, body, svg, canvas, #displayNetwork { 
+  width: 100%; 
+  height: 100%; 
+  position: absolute;
+  overflow: wrap;
+}
+
+.moreInfo {
+  text-align: left;
+  padding-left: 2em;
+}
+
+h1 {
+  padding-bottom: .2em;
+  font-weight: bold;
+  text-align: center;
+}
+
+#userInput {
+  border: .1em solid black;
+  border-radius: 4em;
+  padding: 1em;
+  text-align: center;
+}
+
+input[type="submit"], input[type="button"] {
+  padding: .2em .5em;
+  font-size: 1em;
+  border: .2em solid;
+  background-color: black;
+  border-radius: 4em;
+  color: white;
+  margin-top: .2em;
+  font-weight: bold;
+}
+
+canvas {
+  padding: 0;
+  background: black;
+}
+
+.node-label {
+  position: absolute;
+  pointer-events: none;
+  color: white;
+  z-index: 10;
+}

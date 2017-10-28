@@ -4,42 +4,67 @@
     <title>Networking Words </title>
     <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script> -->
     <script type='application/javascript' src='vivagraph.min.js'> </script>
-    <style type="text/css" media="screen">
-        html, body, svg, canvas, #displayNetwork { width: 100%; height: 100%; position: absolute; overflow: wrap;}
-
-        .node-label {
-                  position: absolute;
-                  pointer-events: none;
-                  color: black;
-                  z-index: 10;
-            }
-    </style>
+    <link rel="stylesheet" href="style.css">
   </head>
   <body>
-    <section class="user-input">
+    <section class="moreInfo">
+      <h1>Diagramming Words</h1>
+      <p>
+      This page will display a network diagram using a javascript library called VivaGraph. You may enter some words to render in a network diagram using the input field provided. Select one of the two rendering modes listed before clicking submit. 
+      </p>
+      <p>
+      In the network diagram, whole words are marked with a blue square. The letters within words have no marking. 
+      </p>
+      <p>
+      You can add words to the existing network diagram by updating the input field provided and resubmitting. You can also change the rendering mode and resubmit.
+      </p>
+      <p>
+      To clear the network and start fresh, click the reset button.
+    </p>
+    </section>
+    <section id="userInput">
       <div>
         <form name="mainForm">
-          Enter words to render in a network here:
-          <input name="userWords" type="text"> <br>
+          Enter words to render in a network diagram here:
+          <input name="userWords" type="text" required><br>
           Select rendering mode:
-          <input type="radio" name="renderingMode" value="SVG">SVG
-          <input type="radio" name="renderingMode" value='webGL'>WebGL <br>
+          <input type="radio" name="renderingMode" value="SVG" required>SVG
+          <input type="radio" name="renderingMode" value='WebGL'>WebGL <br>
           <input type="submit" value="submit">
+          <input type='button' id="resetButton" value='Reset'>
         </form> 
       </div>
     </section>
-    <div>
-      <button id="resetButton">Reset</button>
-    </div>
     <section>
       <div id="displayNetwork"></div>
     </section>
     <script> 
+      const smoothScroll = function(target) {
+          var scrollContainer = target;
+          do { //find scroll container
+              scrollContainer = scrollContainer.parentNode;
+              if (!scrollContainer) return;
+              scrollContainer.scrollTop += 1;
+          } while (scrollContainer.scrollTop == 0);
+          
+          var targetY = 0;
+          do { //find the top of target relatively to the container
+              if (target == scrollContainer) break;
+              targetY += target.offsetTop;
+          } while (target = target.offsetParent);
+          
+          scroll = function(c, a, b, i) {
+              i++; if (i > 30) return;
+              c.scrollTop = a + (b - a) / 30 * i;
+              setTimeout(function(){ scroll(c, a, b, i); }, 20);
+          }
+          // start scrolling
+          scroll(scrollContainer, scrollContainer.scrollTop, targetY, 0);
+      };
+
       const form = document.mainForm;
       let graph = Viva.Graph.graph();
-      //let graphics = undefined;
       const container = document.getElementById('displayNetwork');
-      
 
       function generateNodeGraphics(mode) {
         if (mode === 'SVG') {
@@ -47,19 +72,34 @@
           graphics.node((node) => {
             const ui = Viva.Graph.svg('g');
             const svgText = Viva.Graph.svg('text').text(node.data.text);
+            if (node.data.type === 'whole word') {
+              const rect = Viva.Graph.svg('rect')
+                     .attr('width', 10)
+                     .attr('height', 10)
+                     .attr('fill', '#00a2e8');
+              ui.append(rect);
+            }
             ui.append(svgText);
             return ui;
-        }).placeNode((nodeUI, pos) => {
-          nodeUI.attr('transform', 'translate(' + (pos.x) + ',' + (pos.y) + ')');
-        });
-        const renderer = Viva.Graph.View.renderer(graph, {
-            container: document.getElementById('displayNetwork'),
-            graphics: graphics,
+          }).placeNode((nodeUI, pos) => {
+            nodeUI.attr('transform', 'translate(' + (pos.x) + ',' + (pos.y) + ')');
+          });
+          const renderer = Viva.Graph.View.renderer(graph, {
+              container: document.getElementById('displayNetwork'),
+              graphics: graphics,
           });
           renderer.run();
-        } else if (mode === 'webGL') {
-          function generateDOMLabels(graph) {
-            // this will map node id into DOM element
+        } else if (mode === 'WebGL') {
+          const graphics = Viva.Graph.View.webglGraphics();
+          const transformIfLetter = (n) => {
+            if (n.data.type === 'letter') {
+              const nodeUI = graphics.getNodeUI(n.id);
+              nodeUI.color = 0xffffffff;
+              nodeUI.size = 0;
+            }
+          };
+
+          const generateDOMLabels = (graph) => {
             const labels = Object.create(null);
             graph.forEachNode((node) => {
               const label = document.createElement('span');
@@ -68,14 +108,10 @@
               labels[node.id] = label;
               container.appendChild(label);
             });
-            // NOTE: If your graph changes over time you will need to
-            // monitor graph changes and update DOM elements accordingly
             return labels;
           }
 
-          const graphics = Viva.Graph.View.webglGraphics();
           const domLabels = generateDOMLabels(graph);
-          //console.log('domLabels', domLabels);
           graphics.placeNode((ui, pos) => {
             const domPos = {
               x: pos.x,
@@ -83,12 +119,14 @@
             };
             graphics.transformGraphToClientCoordinates(domPos);
 
+            transformIfLetter(ui.node);
             const nodeId = ui.node.id;
-            const labelStyle = domLabels[nodeId].style;
-            labelStyle.left = domPos.x + 'px';
-            labelStyle.top = domPos.y + 'px';
+            if (domLabels[nodeId]) {
+              const labelStyle = domLabels[nodeId].style;
+              labelStyle.left = domPos.x + 'px';
+              labelStyle.top = domPos.y + 'px';
+            }
           });
-          // console.log('graphics', graphics);
           const renderer = Viva.Graph.View.renderer(graph, {
             container: document.getElementById('displayNetwork'),
             graphics: graphics,
@@ -96,35 +134,27 @@
           renderer.run();
         }
       }
-      // graphics.node((node) => {
-      //   const ui = Viva.Graph.svg('g'); // .attr('stroke', 'green').attr('stroke-width', 1);
-      //   // const circle = Viva.Graph.svg('circle').attr('cy', 25).attr('cx', 25).attr('r', 15);
-      //   const svgText = Viva.Graph.svg('text').text(node.data.text);
-      //   // const rect = Viva.Graph.svg('rect')
-      //   //                  .attr('width', 20)
-      //   //                  .attr('height', 10)
-      //   //                  .attr('fill', '#00a2e8');
-      //   // ui.append(circle);
-      //   ui.append(svgText);
-      //   // ui.append(rect);
-      //   return ui;
-      // }).placeNode((nodeUI, pos) => {
-      //   nodeUI.attr('transform', 'translate(' + (pos.x) + ',' + (pos.y) + ')');
-      // });
 
       function handleForm(event) {
         event.preventDefault();
-        // console.log('innerHTML:', document.getElementById('displayNetwork').innerHTML);
+        document.getElementById('displayNetwork').innerHTML = '';
         const words = document.mainForm.userWords.value;
         const rendMode = document.mainForm.renderingMode.value;
         parseConnection(words);
         generateNodeGraphics(rendMode);
-        // renderer.run();
+        smoothScroll(document.getElementById('userInput'));
       }
       form.addEventListener('submit', handleForm);
-      document.getElementById('resetButton').addEventListener('click', () => {
-        // document.getElementById('displayNetwork').innerHTML = '';
+
+      document.getElementById('resetButton').addEventListener('click', (e) => {
         window.location.reload();
+        // e.preventDefault();
+        // document.getElementById('displayNetwork').innerHTML = '';
+        // document.mainForm.userWords.value = '';
+        // const rendMode = document.getElementsByName('renderingMode');
+        // rendMode.forEach((input) => {
+        //   input.checked = false;
+        // });
       });
 
       function parseConnection(words) {

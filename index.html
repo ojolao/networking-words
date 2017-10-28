@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Networking Words </title>
-    <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script> -->
-    <script type='application/javascript' src='vivagraph.min.js'> </script>
+    <title>Networking Words</title>
+    <script type='application/javascript' src='javascript/vivagraph.min.js'></script>
+    <script type='application/javascript' src='javascript/smoothScroll.js'></script>
+    <script type='application/javascript' src='javascript/generateNodeGraphics.js'></script>
+    <script type='application/javascript' src='javascript/parseConnection.js'></script>
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <section class="moreInfo">
       <h1>Diagramming Words</h1>
       <p>
-      This page will display a network diagram using a javascript library called VivaGraph. You may enter some words to render in a network diagram using the input field provided. Select one of the two rendering modes listed before clicking submit. 
+      This page will display a network diagram using a javascript library called VivaGraph. You may enter some words to render in a network diagram using the input field provided. Select one of the two rendering modes listed before clicking submit (or pressing enter). 
       </p>
       <p>
       In the network diagram, whole words are marked with a blue square. The letters within words have no marking. 
@@ -38,174 +40,6 @@
     <section>
       <div id="displayNetwork"></div>
     </section>
-    <script> 
-      const smoothScroll = function(target) {
-          var scrollContainer = target;
-          do { //find scroll container
-              scrollContainer = scrollContainer.parentNode;
-              if (!scrollContainer) return;
-              scrollContainer.scrollTop += 1;
-          } while (scrollContainer.scrollTop == 0);
-          
-          var targetY = 0;
-          do { //find the top of target relatively to the container
-              if (target == scrollContainer) break;
-              targetY += target.offsetTop;
-          } while (target = target.offsetParent);
-          
-          scroll = function(c, a, b, i) {
-              i++; if (i > 30) return;
-              c.scrollTop = a + (b - a) / 30 * i;
-              setTimeout(function(){ scroll(c, a, b, i); }, 20);
-          }
-          // start scrolling
-          scroll(scrollContainer, scrollContainer.scrollTop, targetY, 0);
-      };
-
-      const form = document.mainForm;
-      let graph = Viva.Graph.graph();
-      const container = document.getElementById('displayNetwork');
-
-      function generateNodeGraphics(mode) {
-        if (mode === 'SVG') {
-          graphics = Viva.Graph.View.svgGraphics();
-          graphics.node((node) => {
-            const ui = Viva.Graph.svg('g');
-            const svgText = Viva.Graph.svg('text').text(node.data.text);
-            if (node.data.type === 'whole word') {
-              const rect = Viva.Graph.svg('rect')
-                     .attr('width', 10)
-                     .attr('height', 10)
-                     .attr('fill', '#00a2e8');
-              ui.append(rect);
-            }
-            ui.append(svgText);
-            return ui;
-          }).placeNode((nodeUI, pos) => {
-            nodeUI.attr('transform', 'translate(' + (pos.x) + ',' + (pos.y) + ')');
-          });
-          const renderer = Viva.Graph.View.renderer(graph, {
-              container: document.getElementById('displayNetwork'),
-              graphics: graphics,
-          });
-          renderer.run();
-        } else if (mode === 'WebGL') {
-          const graphics = Viva.Graph.View.webglGraphics();
-          const transformIfLetter = (n) => {
-            if (n.data.type === 'letter') {
-              const nodeUI = graphics.getNodeUI(n.id);
-              nodeUI.color = 0xffffffff;
-              nodeUI.size = 0;
-            }
-          };
-
-          const generateDOMLabels = (graph) => {
-            const labels = Object.create(null);
-            graph.forEachNode((node) => {
-              const label = document.createElement('span');
-              label.classList.add('node-label');
-              label.innerText = node.data.text;
-              labels[node.id] = label;
-              container.appendChild(label);
-            });
-            return labels;
-          }
-
-          const domLabels = generateDOMLabels(graph);
-          graphics.placeNode((ui, pos) => {
-            const domPos = {
-              x: pos.x,
-              y: pos.y,
-            };
-            graphics.transformGraphToClientCoordinates(domPos);
-
-            transformIfLetter(ui.node);
-            const nodeId = ui.node.id;
-            if (domLabels[nodeId]) {
-              const labelStyle = domLabels[nodeId].style;
-              labelStyle.left = domPos.x + 'px';
-              labelStyle.top = domPos.y + 'px';
-            }
-          });
-          const renderer = Viva.Graph.View.renderer(graph, {
-            container: document.getElementById('displayNetwork'),
-            graphics: graphics,
-          });
-          renderer.run();
-        }
-      }
-
-      function handleForm(event) {
-        event.preventDefault();
-        document.getElementById('displayNetwork').innerHTML = '';
-        const words = document.mainForm.userWords.value;
-        const rendMode = document.mainForm.renderingMode.value;
-        parseConnection(words);
-        generateNodeGraphics(rendMode);
-        smoothScroll(document.getElementById('userInput'));
-      }
-      form.addEventListener('submit', handleForm);
-
-      document.getElementById('resetButton').addEventListener('click', (e) => {
-        window.location.reload();
-        // e.preventDefault();
-        // document.getElementById('displayNetwork').innerHTML = '';
-        // document.mainForm.userWords.value = '';
-        // const rendMode = document.getElementsByName('renderingMode');
-        // rendMode.forEach((input) => {
-        //   input.checked = false;
-        // });
-      });
-
-      function parseConnection(words) {
-        const wordCol = words.split(' ');
-        const chars = {};
-        wordCol.forEach((word, i) => {
-          graph.addNode(word, { text: word, type: 'whole word' });
-          const wordArray = word.split('');
-          wordArray.forEach((char) => {
-            if (!chars[char]) {
-              const newNodeId = char + 'count1';
-              chars[char] = { count: 1, count1: {} };
-              graph.addNode(newNodeId, { text: char, type: 'letter' });
-              chars[char].count1[word] = true;
-              graph.addLink(newNodeId, word);
-            } else {
-                const addLetters = () => {
-                  chars[char].count++;
-                  const charCountStr = 'count' + chars[char].count;
-                  const nodeId = char + charCountStr;
-                  chars[char][charCountStr] = {};
-                  chars[char][charCountStr][word] = true;
-                  graph.addNode(nodeId, { text: char, type: 'letter' });
-                  graph.addLink(nodeId, word);
-                };
-              if (i === 0) { // need to reevaluate since I'm repeating
-                addLetters();
-              } else {
-                let start = 1;
-                let inserted = false;
-                while (start <= chars[char].count) {
-                  const currentCount = 'count' + start;
-                  if (!chars[char][currentCount][word]) {
-                    const curNodeId = char + currentCount;
-                    chars[char][currentCount][word] = true;
-                    graph.addLink(curNodeId, word);
-                    inserted = true;
-                    break;
-                  } else {
-                    start++;
-                  }
-                }
-                if (!inserted) {
-                  addLetters();
-                }
-              }
-            }
-          });
-        });
-        return chars;
-      }
-    </script>
+    <script type='application/javascript' src='javascript/eventListening.js'></script>
   </body>
 </html>
